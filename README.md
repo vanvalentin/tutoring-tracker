@@ -9,7 +9,6 @@ A web application for tracking tutoring lessons, transportation expenses, materi
 - **Transportation** – Track travel expenses (MTR, Taxi, Bus, Other)
 - **Material** – Record material purchases and whether paid by parent
 - **Stats** – Monthly financial summary with bar chart
-- **Master Data** – Consolidated transaction log (derived from Lessons, Transportation, Material)
 - **Fees** – Pricing lookup table for lesson durations
 - **Students** – Student directory with location, goals, and payment methods
 

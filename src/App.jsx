@@ -19,7 +19,6 @@ import LessonsPage from './pages/LessonsPage'
 import TransportationPage from './pages/TransportationPage'
 import MaterialPage from './pages/MaterialPage'
 import StatsPage from './pages/StatsPage'
-import MasterDataPage from './pages/MasterDataPage'
 import FeesPage from './pages/FeesPage'
 import StudentsPage from './pages/StudentsPage'
 
@@ -38,7 +37,6 @@ function AppRoutes() {
                 <Route path="/transportation" element={<TransportationPage />} />
                 <Route path="/material" element={<MaterialPage />} />
                 <Route path="/stats" element={<StatsPage />} />
-                <Route path="/master-data" element={<MasterDataPage />} />
                 <Route path="/fees" element={<FeesPage />} />
                 <Route path="/students" element={<StudentsPage />} />
               </Routes>
