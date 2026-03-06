@@ -1,8 +1,9 @@
 import { useLessons, useTransportation, useMaterial } from '../hooks/useSupabase'
 import { useMasterData } from '../hooks/useMasterData'
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -20,9 +21,9 @@ export default function StatsPage() {
 
   const chartData = stats.map((s) => ({
     month: s.month,
-    lessonIncome: s.lessonIncome,
-    materialExpense: s.materialExpense,
-    transportationExpense: s.transportationExpense,
+    lessonIncome: s.lessonIncome === 0 ? null : s.lessonIncome,
+    materialExpense: s.materialExpense === 0 ? null : s.materialExpense,
+    transportationExpense: s.transportationExpense === 0 ? null : s.transportationExpense,
     grandTotal: s.grandTotal,
   }))
 
@@ -107,7 +108,7 @@ export default function StatsPage() {
           <h3 className="mb-4 text-lg font-medium text-gray-900">Revenue per month</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -117,11 +118,11 @@ export default function StatsPage() {
                 />
                 <Legend />
                 <ReferenceLine y={0} stroke="#94a3b8" />
-                <Bar dataKey="lessonIncome" name="Lesson Income" fill="#f97316" />
-                <Bar dataKey="materialExpense" name="Material Expense" fill="#22c55e" />
-                <Bar dataKey="transportationExpense" name="Transportation Expense" fill="#b91c1c" />
-                <Bar dataKey="grandTotal" name="Grand Total" fill="#3b82f6" isAnimationActive={false} />
-              </BarChart>
+                <Bar dataKey="lessonIncome" name="Lesson Income" fill="#16a34a" />
+                <Bar dataKey="materialExpense" name="Material Expense" fill="#475569" stackId="expense" />
+                <Bar dataKey="transportationExpense" name="Transportation Expense" fill="#dc2626" stackId="expense" />
+                <Line type="monotone" dataKey="grandTotal" name="Grand Total" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>

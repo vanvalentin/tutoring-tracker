@@ -21,7 +21,67 @@ export const DEFAULT_FEES = [
   { id: '3', duration: '2.0 hours', fee: 690, description: 'Intensive Private Lesson' },
 ]
 
-export const LOCATIONS = ['Mid-Levels', 'Kwun Tong', 'Tsim Sha Tsui', 'Sheung Wan', 'Sha Tin', 'Central', 'Admiralty', 'Wan Chai', 'Causeway Bay', 'Discovery Bay']
+// HK districts (18) + common areas
+export const LOCATIONS = [
+  // Hong Kong Island districts
+  'Central and Western',
+  'Eastern',
+  'Southern',
+  'Wan Chai',
+  // Kowloon districts
+  'Kowloon City',
+  'Kwun Tong',
+  'Sham Shui Po',
+  'Wong Tai Sin',
+  'Yau Tsim Mong',
+  // New Territories districts
+  'Islands',
+  'Kwai Tsing',
+  'North',
+  'Sai Kung',
+  'Sha Tin',
+  'Tai Po',
+  'Tsuen Wan',
+  'Tuen Mun',
+  'Yuen Long',
+  // Hong Kong Island areas
+  'Aberdeen',
+  'Admiralty',
+  'Causeway Bay',
+  'Central',
+  'Chai Wan',
+  'Happy Valley',
+  'Kennedy Town',
+  'Mid-Levels',
+  'North Point',
+  'Pok Fu Lam',
+  'Quarry Bay',
+  'Sai Ying Pun',
+  'Sheung Wan',
+  'Shau Kei Wan',
+  'Stanley',
+  'Tai Koo',
+  // Kowloon areas
+  'Cheung Sha Wan',
+  'Ho Man Tin',
+  'Jordan',
+  'Kowloon Bay',
+  'Kowloon Tong',
+  'Lai Chi Kok',
+  'Lam Tin',
+  'Mei Foo',
+  'Mong Kok',
+  'Ngau Tau Kok',
+  'Tai Kok Tsui',
+  'To Kwa Wan',
+  'Tsim Sha Tsui',
+  'Yau Ma Tei',
+  // New Territories areas
+  'Discovery Bay',
+  'Fanling',
+  'Ma On Shan',
+  'Tung Chung',
+]
 export const GOALS = ['IELTS Speaking', 'Business English', 'Academic Writing', 'Conversational Fluency', 'TOEFL Preparation', 'Legal English']
 export const PAYMENT_METHODS = ['FPS', 'PayMe', 'Bank Transfer', 'Cash']
 export const TRANSPORT_TYPES = ['MTR', 'Taxi', 'Bus', 'Other']

@@ -8,8 +8,8 @@ export function useMasterData(lessons, transportation, material) {
   )
 
   const stats = useMemo(
-    () => aggregateStatsByMonth(masterData),
-    [masterData]
+    () => aggregateStatsByMonth(lessons, transportation, material),
+    [lessons, transportation, material]
   )
 
   return { masterData, stats }

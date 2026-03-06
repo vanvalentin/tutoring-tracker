@@ -10,6 +10,7 @@ export function deriveMasterData(lessons, transportation, material) {
   const entries = []
 
   lessons.forEach((lesson, i) => {
+    if (lesson.status === 'canceled') return
     entries.push({
       id: `lesson-${lesson.id ?? i}`,
       date: lesson.date,
@@ -39,39 +40,58 @@ export function deriveMasterData(lessons, transportation, material) {
   return entries.sort((a, b) => new Date(a.date) - new Date(b.date))
 }
 
-export function aggregateStatsByMonth(masterData) {
+function monthKey(date) {
+  const d = new Date(date)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+export function aggregateStatsByMonth(lessons, transportation, material) {
   const byMonth = {}
 
-  masterData.forEach((entry) => {
-    const date = new Date(entry.date)
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-
-    if (!byMonth[monthKey]) {
-      byMonth[monthKey] = {
-        month: monthKey,
+  lessons.forEach((lesson) => {
+    if (lesson.status === 'canceled') return
+    const key = monthKey(lesson.date)
+    if (!byMonth[key]) {
+      byMonth[key] = {
+        month: key,
         lessonIncome: 0,
         materialExpense: 0,
         transportationExpense: 0,
         grandTotal: 0,
       }
     }
+    byMonth[key].lessonIncome += Number(lesson.fee) || 0
+  })
 
-    const row = byMonth[monthKey]
-
-    switch (entry.category) {
-      case 'Lesson Income':
-        row.lessonIncome += entry.amount
-        break
-      case 'Material Expense':
-        row.materialExpense += entry.amount
-        break
-      case 'Transportation Expense':
-        row.transportationExpense += entry.amount
-        break
-      default:
-        break
+  ;[].concat(transportation || []).forEach((t) => {
+    const key = monthKey(t.date)
+    if (!byMonth[key]) {
+      byMonth[key] = {
+        month: key,
+        lessonIncome: 0,
+        materialExpense: 0,
+        transportationExpense: 0,
+        grandTotal: 0,
+      }
     }
+    byMonth[key].transportationExpense += -Math.abs(Number(t.amount) || 0)
+  })
 
+  ;[].concat(material || []).forEach((m) => {
+    const key = monthKey(m.date)
+    if (!byMonth[key]) {
+      byMonth[key] = {
+        month: key,
+        lessonIncome: 0,
+        materialExpense: 0,
+        transportationExpense: 0,
+        grandTotal: 0,
+      }
+    }
+    byMonth[key].materialExpense += -Math.abs(Number(m.amount) || 0)
+  })
+
+  Object.values(byMonth).forEach((row) => {
     row.grandTotal = row.lessonIncome + row.materialExpense + row.transportationExpense
   })
 

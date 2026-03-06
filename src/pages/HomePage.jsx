@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useLessons } from '../hooks/useSupabase'
 
 const QUICK_ADD_BUTTONS = [
@@ -27,12 +28,13 @@ export default function HomePage() {
     let pending = 0
 
     lessons.forEach((l) => {
+      if (l.status === 'canceled') return
       const d = new Date(l.date)
       if (d.getMonth() === thisMonth && d.getFullYear() === thisYear) {
         revenue += l.fee ?? 0
-        // Only count unpaid lessons that have already happened (date in the past)
-        if (!l.paid && l.date < todayStr) pending += 1
       }
+      // Count all unpaid lessons that have already happened (any past date)
+      if (!l.paid && l.date < todayStr) pending += 1
     })
 
     return {
@@ -55,18 +57,30 @@ export default function HomePage() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <Link
+              to="/stats"
+              className="group block cursor-pointer rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:shadow-md"
+            >
               <p className="text-sm font-medium text-gray-500">Current month revenue</p>
               <p className="mt-1 text-2xl font-semibold text-gray-900">
                 HKD {currentMonthRevenue.toLocaleString()}
               </p>
               <p className="mt-0.5 text-xs text-gray-400">{monthLabel}</p>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="mt-2 text-xs font-medium text-gray-500 group-hover:text-gray-700">
+                View stats →
+              </p>
+            </Link>
+            <Link
+              to="/lessons?filter=pending"
+              className="group block cursor-pointer rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:shadow-md"
+            >
               <p className="text-sm font-medium text-gray-500">Lesson payments pending</p>
               <p className="mt-1 text-2xl font-semibold text-gray-900">{pendingCount}</p>
-              <p className="mt-0.5 text-xs text-gray-400">Unpaid this month</p>
-            </div>
+              <p className="mt-0.5 text-xs text-gray-400">Unpaid past lessons</p>
+              <p className="mt-2 text-xs font-medium text-gray-500 group-hover:text-gray-700">
+                View lessons →
+              </p>
+            </Link>
           </div>
 
           <div>

@@ -3,6 +3,7 @@ const variants = {
   warning: 'bg-amber-100 text-amber-800',
   error: 'bg-red-100 text-red-800',
   neutral: 'bg-gray-100 text-gray-700',
+  canceled: 'bg-gray-200 text-gray-600',
 }
 
 export default function StatusBadge({ children, variant = 'neutral' }) {

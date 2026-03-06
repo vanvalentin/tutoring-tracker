@@ -12,6 +12,7 @@ function toAppStudent(row) {
     address: row.address,
     goal: row.goal,
     paymentMethod: row.payment_method,
+    defaultDuration: row.default_duration ?? null,
     notes: row.notes,
     active: row.active ?? true,
   }
@@ -38,6 +39,7 @@ function toAppLesson(row) {
     fee: parseFloat(row.fee),
     paid: row.paid ?? false,
     notes: row.notes,
+    status: row.status ?? 'scheduled',
   }
 }
 
@@ -105,6 +107,7 @@ export function useStudents() {
           address: student.address,
           goal: student.goal,
           payment_method: student.paymentMethod,
+          default_duration: (student.defaultDuration && student.defaultDuration.trim()) || null,
           notes: student.notes,
           active: student.active ?? true,
         })
@@ -127,6 +130,7 @@ export function useStudents() {
         address: updates.address,
         goal: updates.goal,
         payment_method: updates.paymentMethod,
+        default_duration: (updates.defaultDuration && updates.defaultDuration.trim()) || null,
         notes: updates.notes,
         active: updates.active ?? true,
       })
@@ -258,6 +262,7 @@ export function useLessons() {
         fee: lesson.fee,
         paid: lesson.paid ?? false,
         notes: lesson.notes,
+        status: lesson.status ?? 'scheduled',
       }
       if (lesson.time) insertRow.time = lesson.time
       const { data: row, error: err } = await supabase
@@ -285,6 +290,7 @@ export function useLessons() {
           fee: lesson.fee,
           paid: lesson.paid ?? false,
           notes: lesson.notes ?? '',
+          status: lesson.status ?? 'scheduled',
         }
         if (lesson.time) row.time = lesson.time
         return row
@@ -310,6 +316,7 @@ export function useLessons() {
     if (updates.duration !== undefined) dbUpdates.duration = updates.duration
     if (updates.fee !== undefined) dbUpdates.fee = updates.fee
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+    if (updates.status !== undefined) dbUpdates.status = updates.status
     const { data: row, error: err } = await supabase
       .from('lessons')
       .update(dbUpdates)

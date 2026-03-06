@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS students (
   address TEXT,
   goal TEXT,
   payment_method TEXT,
+  default_duration TEXT,
   notes TEXT,
   active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS lessons (
   fee DECIMAL(10,2) NOT NULL,
   paid BOOLEAN DEFAULT false,
   notes TEXT,
+  status TEXT NOT NULL DEFAULT 'scheduled',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

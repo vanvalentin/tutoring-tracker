@@ -44,6 +44,7 @@ export default function SortableTable({
   cardTitleKey,
   cardSubtitleKeys,
   headerSlot,
+  getRowClassName,
 }) {
   const [sorting, setSorting] = useState(initialSort || [])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -162,18 +163,28 @@ export default function SortableTable({
                 </td>
               </tr>
             ) : (
-              rows.map((row, index) => (
+              rows.map((row, index) => {
+                const rowClass = getRowClassName?.(row.original)
+                const baseClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                return (
                 <tr
                   key={row.id}
-                  className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}
+                  className={rowClass ? `${baseClass} ${rowClass}` : baseClass}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-3 text-sm text-gray-900">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {cell.column.id === 'actions' ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      ) : (
+                        flexRender(cell.column.columnDef.cell, cell.getContext())
+                      )}
                     </td>
                   ))}
                 </tr>
-              ))
+              )
+              })
             )}
           </tbody>
         </table>
@@ -258,10 +269,11 @@ export default function SortableTable({
               : subtitleCol
                 ? getCellValue(row, subtitleCol)
                 : null
+            const cardClass = getRowClassName?.(row.original)
             return (
               <div
                 key={row.id}
-                className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+                className={`overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm ${cardClass ?? ''}`}
               >
                 <div className="flex items-start justify-between gap-2 border-b border-gray-100 px-4 py-3">
                   <div className="min-w-0 flex-1">

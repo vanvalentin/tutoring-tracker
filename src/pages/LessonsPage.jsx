@@ -16,6 +16,11 @@ import {
   Stack,
   IconButton,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -97,18 +102,25 @@ const COLUMNS = [
   {
     key: 'paid',
     label: 'Status',
-    cell: (val, row) => (
-      <div className="flex items-center gap-2">
-        <StatusBadge variant={val ? 'success' : 'neutral'}>
-          {val ? 'Paid' : 'Unpaid'}
-        </StatusBadge>
-        <Checkbox
-          size="small"
-          checked={val ?? false}
-          onChange={() => row._onTogglePaid?.(row)}
-        />
-      </div>
-    ),
+    cell: (val, row) => {
+      if (row.status === 'canceled') {
+        return (
+          <StatusBadge variant="canceled">Canceled</StatusBadge>
+        )
+      }
+      return (
+        <div className="flex items-center gap-2">
+          <StatusBadge variant={val ? 'success' : 'neutral'}>
+            {val ? 'Paid' : 'Unpaid'}
+          </StatusBadge>
+          <Checkbox
+            size="small"
+            checked={val ?? false}
+            onChange={() => row._onTogglePaid?.(row)}
+          />
+        </div>
+      )
+    },
   },
   { key: 'notes', label: 'Notes' },
 ]
@@ -140,11 +152,24 @@ export default function LessonsPage() {
 
   useEffect(() => {
     if (searchParams.get('add') === '1') {
-      setSearchParams({}, { replace: true })
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('add')
+        return next
+      }, { replace: true })
       setFormData(resetFormData())
       setModalOpen(true)
     }
   }, [searchParams])
+
+  const filterFromUrl = searchParams.get('filter')
+  useEffect(() => {
+    if (filterFromUrl === 'pending' || filterFromUrl === 'today' || filterFromUrl === 'month') {
+      setQuickFilter(filterFromUrl)
+    } else if (filterFromUrl === null || filterFromUrl === '') {
+      setQuickFilter(null)
+    }
+  }, [filterFromUrl])
 
   const activeStudents = students.filter((s) => s.active !== false)
 
@@ -165,6 +190,8 @@ export default function LessonsPage() {
 
   const [confirmStep, setConfirmStep] = useState('form')
   const [pendingLessons, setPendingLessons] = useState([])
+  const [confirmRemoveIndex, setConfirmRemoveIndex] = useState(null)
+  const [confirmDeleteLesson, setConfirmDeleteLesson] = useState(null)
 
   const handleProceedToConfirm = (e) => {
     e.preventDefault()
@@ -290,10 +317,26 @@ export default function LessonsPage() {
     }
   }
 
+  const handleCancel = async (lesson) => {
+    try {
+      await update(lesson.id, { status: 'canceled' })
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  const handleRestore = async (lesson) => {
+    try {
+      await update(lesson.id, { status: 'scheduled' })
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
   const handleDelete = async (id) => {
-    if (!confirm('Delete this lesson?')) return
     try {
       await remove(id)
+      setConfirmDeleteLesson(null)
     } catch (err) {
       alert(err.message)
     }
@@ -313,6 +356,11 @@ export default function LessonsPage() {
     _onShowStudent: setStudentPopupStudent,
   }))
 
+  const isCanceled = (row) => row.status === 'canceled'
+  const todayStr = dayjs().format('YYYY-MM-DD')
+  const isTodayLesson = (row) => (row.date ?? '') === todayStr
+  const isPastLesson = (row) => (row.date ?? '') < todayStr
+
   const filteredTableData = useMemo(() => {
     if (!quickFilter) return tableData
     const today = dayjs().format('YYYY-MM-DD')
@@ -327,7 +375,7 @@ export default function LessonsPage() {
         case 'month':
           return date >= monthStart && date <= monthEnd
         case 'pending':
-          return date < today && !row.paid
+          return date < today && !row.paid && row.status !== 'canceled'
         default:
           return true
       }
@@ -367,7 +415,7 @@ export default function LessonsPage() {
           <Stack spacing={2} sx={{ pt: 1 }}>
             <Box>
               <Typography variant="caption" color="text.secondary" display="block">
-                Location
+                District/Area
               </Typography>
               <Typography variant="body2">{studentPopupStudent.location || '—'}</Typography>
             </Box>
@@ -388,6 +436,12 @@ export default function LessonsPage() {
                 Payment method
               </Typography>
               <Typography variant="body2">{studentPopupStudent.paymentMethod || '—'}</Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Default fee
+              </Typography>
+              <Typography variant="body2">{studentPopupStudent.defaultDuration || '—'}</Typography>
             </Box>
             {studentPopupStudent.notes && (
               <Box>
@@ -475,6 +529,8 @@ export default function LessonsPage() {
               placeholder="Optional notes"
               size="small"
               fullWidth
+              multiline
+              minRows={2}
             />
             <Stack direction="row" spacing={1}>
               <Button type="submit" variant="contained">
@@ -496,7 +552,17 @@ export default function LessonsPage() {
             <SearchableSelect
               options={studentOptions}
               value={formData.studentId}
-              onChange={(v) => setFormData({ ...formData, studentId: v })}
+              onChange={(v) => {
+                const student = activeStudents.find((s) => s.id === v)
+                const defaultDuration = student?.defaultDuration
+                const feeEntry = defaultDuration ? fees.find((f) => f.duration === defaultDuration) : null
+                setFormData({
+                  ...formData,
+                  studentId: v,
+                  duration: defaultDuration || formData.duration,
+                  fee: feeEntry ? String(feeEntry.fee) : formData.fee,
+                })
+              }}
               placeholder="Select student..."
               getOptionLabel={(opt) => opt.name ?? opt.label}
               getOptionValue={(opt) => opt.id ?? opt.value}
@@ -592,6 +658,8 @@ export default function LessonsPage() {
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Optional notes"
               fullWidth
+              multiline
+              minRows={2}
             />
             {formData.mode === 'recurring' && recurringDates.length > 0 && (
               <Box sx={{ py: 1.5, px: 2, borderRadius: 1, bgcolor: 'action.hover' }}>
@@ -655,7 +723,7 @@ export default function LessonsPage() {
                         {pendingLessons.length > 1 && (
                           <IconButton
                             size="small"
-                            onClick={() => removePendingLesson(index)}
+                            onClick={() => setConfirmRemoveIndex(index)}
                             sx={{
                               width: 28,
                               height: 28,
@@ -736,6 +804,8 @@ export default function LessonsPage() {
                         placeholder="Optional notes"
                         size="small"
                         fullWidth
+                        multiline
+                        minRows={2}
                       />
                     </Stack>
                   ) : (
@@ -775,6 +845,85 @@ export default function LessonsPage() {
         )}
       </Modal>
 
+      <Dialog
+        open={confirmRemoveIndex !== null}
+        onClose={() => setConfirmRemoveIndex(null)}
+        aria-labelledby="confirm-remove-lesson-title"
+        aria-describedby="confirm-remove-lesson-description"
+      >
+        <DialogTitle id="confirm-remove-lesson-title">Remove lesson?</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-remove-lesson-description">
+            This lesson will be removed from the list. You can add it again from the form if needed.
+          </DialogContentText>
+          {confirmRemoveIndex !== null && pendingLessons[confirmRemoveIndex] && (() => {
+            const lesson = pendingLessons[confirmRemoveIndex]
+            return (
+              <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1, bgcolor: 'grey.100' }}>
+                <Typography variant="body2" component="div">
+                  <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Date: </Box>{formatDate(lesson.date)}<br />
+                  <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Time: </Box>{formatTime(lesson.time)}<br />
+                  <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Student: </Box>{getStudentName(lesson.studentId) || '—'}<br />
+                  {lesson.duration && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Duration: </Box>{lesson.duration}<br /></>}
+                  {lesson.fee != null && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Fee: </Box>{lesson.fee} HKD</>}
+                </Typography>
+              </Box>
+            )
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmRemoveIndex(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (confirmRemoveIndex !== null) {
+                removePendingLesson(confirmRemoveIndex)
+                setConfirmRemoveIndex(null)
+              }
+            }}
+          >
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmDeleteLesson !== null}
+        onClose={() => setConfirmDeleteLesson(null)}
+        aria-labelledby="confirm-delete-lesson-title"
+        aria-describedby="confirm-delete-lesson-description"
+      >
+        <DialogTitle id="confirm-delete-lesson-title">Delete lesson?</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-delete-lesson-description">
+            You are about to permanently delete this lesson.
+          </DialogContentText>
+          {confirmDeleteLesson && (
+            <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1, bgcolor: 'grey.100' }}>
+              <Typography variant="body2" component="div">
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Date: </Box>{formatDate(confirmDeleteLesson.date)}<br />
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Time: </Box>{formatTime(confirmDeleteLesson.time)}<br />
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Student: </Box>{confirmDeleteLesson._studentName ?? '—'}<br />
+                {confirmDeleteLesson.duration && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Duration: </Box>{confirmDeleteLesson.duration}<br /></>}
+                {confirmDeleteLesson.fee != null && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Fee: </Box>{confirmDeleteLesson.fee} HKD</>}
+              </Typography>
+            </Box>
+          )}
+          <DialogContentText sx={{ mt: 1.5 }}>This cannot be undone.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteLesson(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => confirmDeleteLesson !== null && handleDelete(confirmDeleteLesson.id)}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {loading ? (
         <div className="py-8 text-center text-gray-500">Loading...</div>
       ) : (
@@ -785,32 +934,57 @@ export default function LessonsPage() {
           searchPlaceholder="Search by student, date, notes..."
           cardTitleKey="studentName"
           cardSubtitleKeys={['date', 'time']}
+          getRowClassName={(row) =>
+            isCanceled(row)
+              ? '!bg-gray-200 opacity-75'
+              : isTodayLesson(row)
+                ? '!bg-sky-50'
+                : isPastLesson(row)
+                  ? 'opacity-90'
+                  : ''
+          }
           headerSlot={
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
               <Chip
                 label="All"
-                onClick={() => setQuickFilter(null)}
+                onClick={() => {
+                  setQuickFilter(null)
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.delete('filter')
+                    return next
+                  }, { replace: true })
+                }}
                 color={quickFilter === null ? 'primary' : 'default'}
                 variant={quickFilter === null ? 'filled' : 'outlined'}
                 size="small"
               />
               <Chip
                 label="Today"
-                onClick={() => setQuickFilter('today')}
+                onClick={() => {
+                  setQuickFilter('today')
+                  setSearchParams({ filter: 'today' }, { replace: true })
+                }}
                 color={quickFilter === 'today' ? 'primary' : 'default'}
                 variant={quickFilter === 'today' ? 'filled' : 'outlined'}
                 size="small"
               />
               <Chip
                 label="This month"
-                onClick={() => setQuickFilter('month')}
+                onClick={() => {
+                  setQuickFilter('month')
+                  setSearchParams({ filter: 'month' }, { replace: true })
+                }}
                 color={quickFilter === 'month' ? 'primary' : 'default'}
                 variant={quickFilter === 'month' ? 'filled' : 'outlined'}
                 size="small"
               />
               <Chip
                 label="Pending payment"
-                onClick={() => setQuickFilter('pending')}
+                onClick={() => {
+                  setQuickFilter('pending')
+                  setSearchParams({ filter: 'pending' }, { replace: true })
+                }}
                 color={quickFilter === 'pending' ? 'primary' : 'default'}
                 variant={quickFilter === 'pending' ? 'filled' : 'outlined'}
                 size="small"
@@ -822,9 +996,23 @@ export default function LessonsPage() {
               <Button size="small" variant="outlined" onClick={() => handleEditLesson(row)}>
                 Edit
               </Button>
-              <Button size="small" color="error" onClick={() => handleDelete(row.id)}>
-                Delete
-              </Button>
+              {isCanceled(row) ? (
+                <Button size="small" variant="outlined" onClick={() => handleRestore(row)}>
+                  Restore
+                </Button>
+              ) : (
+                <Button size="small" variant="outlined" onClick={() => handleCancel(row)}>
+                  Cancel
+                </Button>
+              )}
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => setConfirmDeleteLesson(row)}
+                aria-label="Delete"
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
             </>
           )}
         />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { TextField, Button, Stack } from '@mui/material'
+import { TextField, Button, Stack, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Box, Typography } from '@mui/material'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import dayjs from 'dayjs'
 import { useTransportation } from '../hooks/useSupabase'
@@ -28,6 +28,7 @@ export default function TransportationPage() {
   const { data: transportation, loading, error, add, update, remove } = useTransportation()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState(null)
   const [formData, setFormData] = useState({
     date: new Date().toISOString().slice(0, 10),
     amount: '',
@@ -99,13 +100,13 @@ export default function TransportationPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this transportation entry?')) return
     try {
       await remove(id)
       if (editingId === id) {
         setEditingId(null)
         setModalOpen(false)
       }
+      setConfirmDeleteItem(null)
     } catch (err) {
       alert(err.message)
     }
@@ -193,6 +194,42 @@ export default function TransportationPage() {
         </form>
       </Modal>
 
+      <Dialog
+        open={confirmDeleteItem !== null}
+        onClose={() => setConfirmDeleteItem(null)}
+        aria-labelledby="confirm-delete-transport-title"
+        aria-describedby="confirm-delete-transport-description"
+      >
+        <DialogTitle id="confirm-delete-transport-title">Delete transportation entry?</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-delete-transport-description">
+            You are about to delete this transportation entry.
+          </DialogContentText>
+          {confirmDeleteItem && (
+            <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1, bgcolor: 'grey.100' }}>
+              <Typography variant="body2" component="div">
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Date: </Box>{formatDate(confirmDeleteItem.date)}<br />
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Amount: </Box>{confirmDeleteItem.amount} HKD<br />
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Type: </Box>{confirmDeleteItem.type || '—'}
+                {confirmDeleteItem.destination?.trim() && <><br /><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Destination: </Box>{confirmDeleteItem.destination}</>}
+                {confirmDeleteItem.note?.trim() && <><br /><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Note: </Box>{confirmDeleteItem.note}</>}
+              </Typography>
+            </Box>
+          )}
+          <DialogContentText sx={{ mt: 1.5 }}>This cannot be undone.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteItem(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => confirmDeleteItem !== null && handleDelete(confirmDeleteItem.id)}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {loading ? (
         <div className="py-8 text-center text-gray-500">Loading...</div>
       ) : (
@@ -207,7 +244,7 @@ export default function TransportationPage() {
               <Button size="small" variant="outlined" onClick={() => handleEdit(row)}>
                 Edit
               </Button>
-              <Button size="small" color="error" onClick={() => handleDelete(row.id)}>
+              <Button size="small" color="error" onClick={() => setConfirmDeleteItem(row)}>
                 Delete
               </Button>
             </>

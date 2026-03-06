@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TextField, Button, Stack } from '@mui/material'
+import { TextField, Button, Stack, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Box, Typography } from '@mui/material'
 import { useFees } from '../hooks/useSupabase'
 import Modal from '../components/Modal'
 import SortableTable from '../components/SortableTable'
@@ -14,6 +14,7 @@ export default function FeesPage() {
   const { data: fees, loading, error, add, update, remove } = useFees()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState(null)
   const [formData, setFormData] = useState({
     duration: '',
     fee: '',
@@ -61,10 +62,10 @@ export default function FeesPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this fee entry?')) return
     try {
       await remove(id)
       if (editingId === id) resetForm()
+      setConfirmDeleteItem(null)
     } catch (err) {
       alert(err.message)
     }
@@ -131,6 +132,42 @@ export default function FeesPage() {
         </form>
       </Modal>
 
+      <Dialog
+        open={confirmDeleteItem !== null}
+        onClose={() => setConfirmDeleteItem(null)}
+        aria-labelledby="confirm-delete-fee-title"
+        aria-describedby="confirm-delete-fee-description"
+      >
+        <DialogTitle id="confirm-delete-fee-title">Delete fee entry?</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-delete-fee-description">
+            You are about to delete this fee entry.
+          </DialogContentText>
+          {confirmDeleteItem && (
+            <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1, bgcolor: 'grey.100' }}>
+              <Typography variant="body2" component="div">
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Duration: </Box>{confirmDeleteItem.duration}<br />
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Fee: </Box>{confirmDeleteItem.fee} HKD
+                {confirmDeleteItem.description?.trim() && (
+                  <><br /><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Description: </Box>{confirmDeleteItem.description}</>
+                )}
+              </Typography>
+            </Box>
+          )}
+          <DialogContentText sx={{ mt: 1.5 }}>This cannot be undone.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteItem(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => confirmDeleteItem !== null && handleDelete(confirmDeleteItem.id)}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {loading ? (
         <div className="py-8 text-center text-gray-500">Loading...</div>
       ) : (
@@ -145,7 +182,7 @@ export default function FeesPage() {
               <Button size="small" onClick={() => handleEdit(row)}>
                 Edit
               </Button>
-              <Button size="small" color="error" onClick={() => handleDelete(row.id)}>
+              <Button size="small" color="error" onClick={() => setConfirmDeleteItem(row)}>
                 Delete
               </Button>
             </>
