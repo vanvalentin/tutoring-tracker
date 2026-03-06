@@ -34,6 +34,7 @@ import SearchableSelect from '../components/SearchableSelect'
 import TimePickerInput from '../components/TimePickerInput'
 import SortableTable from '../components/SortableTable'
 import StatusBadge from '../components/StatusBadge'
+import TransitInfo from '../components/TransitInfo'
 
 const WEEKDAYS = [
   { value: 1, label: 'Monday' },
@@ -44,6 +45,35 @@ const WEEKDAYS = [
   { value: 6, label: 'Saturday' },
   { value: 0, label: 'Sunday' },
 ]
+
+/** Convert "HH:MM" to total minutes from midnight */
+function timeToMinutes(timeStr) {
+  if (!timeStr) return null
+  const [h, m] = timeStr.split(':').map(Number)
+  return h * 60 + (m || 0)
+}
+
+/** Parse duration strings like "1 hour", "1.5 hours", "90 minutes" into minutes */
+function parseDurationMinutes(durationStr) {
+  if (!durationStr) return 0
+  const match = durationStr.match(/(\d+(?:[.,]\d+)?)\s*(h(?:our|r)?s?|m(?:in(?:ute)?s?)?)/i)
+  if (!match) return 0
+  const num = parseFloat(match[1].replace(',', '.'))
+  const unit = match[2].toLowerCase()
+  return unit.startsWith('h') ? Math.round(num * 60) : Math.round(num)
+}
+
+/**
+ * Minutes between end of prevLesson and start of currLesson.
+ * Returns null if either has no time recorded.
+ */
+function getGapMinutes(prevLesson, currLesson) {
+  const prevStart = timeToMinutes(prevLesson.time)
+  const currStart = timeToMinutes(currLesson.time)
+  if (prevStart == null || currStart == null) return null
+  const prevEnd = prevStart + parseDurationMinutes(prevLesson.duration)
+  return currStart - prevEnd
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -348,13 +378,25 @@ export default function LessonsPage() {
   const getStudent = (studentId) =>
     students.find((s) => s.id === studentId) ?? null
 
-  const tableData = lessons.map((l) => ({
-    ...l,
-    _studentName: getStudentName(l.studentId),
-    _student: getStudent(l.studentId),
-    _onTogglePaid: handleTogglePaid,
-    _onShowStudent: setStudentPopupStudent,
-  }))
+  const tableData = lessons
+    .slice()
+    .sort((a, b) => {
+      // Primary: date descending
+      if (a.date > b.date) return -1
+      if (a.date < b.date) return 1
+      // Secondary within same date: time ascending (nulls last)
+      if (!a.time && !b.time) return 0
+      if (!a.time) return 1
+      if (!b.time) return -1
+      return a.time.localeCompare(b.time)
+    })
+    .map((l) => ({
+      ...l,
+      _studentName: getStudentName(l.studentId),
+      _student: getStudent(l.studentId),
+      _onTogglePaid: handleTogglePaid,
+      _onShowStudent: setStudentPopupStudent,
+    }))
 
   const isCanceled = (row) => row.status === 'canceled'
   const todayStr = dayjs().format('YYYY-MM-DD')
@@ -689,6 +731,37 @@ export default function LessonsPage() {
           <div className="max-h-[60vh] space-y-3 overflow-y-auto">
             {pendingLessons.map((lesson, index) => {
               const holidayInfo = isHoliday(lesson.date)
+
+              // Find existing scheduled lessons on the same day, sorted by time
+              const sameDayExisting = lessons
+                .filter(
+                  (l) =>
+                    l.date === lesson.date &&
+                    l.status !== 'canceled' &&
+                    l.time
+                )
+                .sort((a, b) => a.time.localeCompare(b.time))
+
+              // Identify the nearest existing lesson before and after this pending one
+              const pendingStart = timeToMinutes(lesson.time)
+              const pendingEnd =
+                pendingStart != null
+                  ? pendingStart + parseDurationMinutes(lesson.duration)
+                  : null
+
+              const lessonBefore = lesson.time
+                ? sameDayExisting.findLast(
+                    (l) => timeToMinutes(l.time) + parseDurationMinutes(l.duration) <= (pendingStart ?? Infinity)
+                  )
+                : null
+              const lessonAfter = lesson.time
+                ? sameDayExisting.find(
+                    (l) => timeToMinutes(l.time) >= (pendingEnd ?? -1)
+                  )
+                : null
+
+              const studentForPending = getStudent(lesson.studentId)
+
               return (
                 <div
                   key={`${lesson.date}-${index}`}
@@ -750,6 +823,26 @@ export default function LessonsPage() {
                   <Typography variant="body2" sx={{ mb: 1.5, fontWeight: 500 }}>
                     {getStudentName(lesson.studentId) || '—'}
                   </Typography>
+
+                  {/* Transit warnings: show transit info to/from adjacent existing lessons */}
+                  {lessonBefore && studentForPending && (
+                    <Box sx={{ mx: -1.5, mb: 1, borderRadius: 1, overflow: 'hidden' }}>
+                      <TransitInfo
+                        fromStudent={getStudent(lessonBefore.studentId)}
+                        toStudent={studentForPending}
+                        gapMinutes={getGapMinutes(lessonBefore, lesson)}
+                      />
+                    </Box>
+                  )}
+                  {lessonAfter && studentForPending && (
+                    <Box sx={{ mx: -1.5, mb: 1, borderRadius: 1, overflow: 'hidden' }}>
+                      <TransitInfo
+                        fromStudent={studentForPending}
+                        toStudent={getStudent(lessonAfter.studentId)}
+                        gapMinutes={getGapMinutes(lesson, lessonAfter)}
+                      />
+                    </Box>
+                  )}
                   {editingLessonIndex === index ? (
                     <Stack spacing={1.5}>
                       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'nowrap' }}>
@@ -943,6 +1036,19 @@ export default function LessonsPage() {
                   ? 'opacity-90'
                   : ''
           }
+          renderBetweenRows={(prevRow, currRow) => {
+            if (prevRow.date !== currRow.date) return null
+            if (prevRow.status === 'canceled' || currRow.status === 'canceled') return null
+            if (!prevRow._student || !currRow._student) return null
+            const gapMinutes = getGapMinutes(prevRow, currRow)
+            return (
+              <TransitInfo
+                fromStudent={prevRow._student}
+                toStudent={currRow._student}
+                gapMinutes={gapMinutes}
+              />
+            )
+          }}
           headerSlot={
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
               <Chip

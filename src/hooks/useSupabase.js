@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { invalidateTransitCacheForStudent } from './useTransitTime'
 
 // Map DB column names (snake_case) to app (camelCase)
 function toAppStudent(row) {
@@ -140,8 +141,10 @@ export function useStudents() {
     if (err) throw err
     const appStudent = toAppStudent(row)
     setData((prev) => prev.map((s) => (s.id === id ? appStudent : s)))
+    // Invalidate transit cache since address may have changed
+    invalidateTransitCacheForStudent(user?.id, id)
     return appStudent
-  }, [])
+  }, [user?.id])
 
   const remove = useCallback(async (id) => {
     await supabase.from('students').delete().eq('id', id)

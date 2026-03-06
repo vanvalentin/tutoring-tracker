@@ -7,7 +7,7 @@ import {
   flexRender,
   createColumnHelper,
 } from '@tanstack/react-table'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Fragment } from 'react'
 import { TextField, Select, MenuItem, FormControl, InputLabel, Box } from '@mui/material'
 import fuzzysort from 'fuzzysort'
 
@@ -45,6 +45,7 @@ export default function SortableTable({
   cardSubtitleKeys,
   headerSlot,
   getRowClassName,
+  renderBetweenRows,
 }) {
   const [sorting, setSorting] = useState(initialSort || [])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -164,25 +165,36 @@ export default function SortableTable({
               </tr>
             ) : (
               rows.map((row, index) => {
+                const prevRow = index > 0 ? rows[index - 1] : null
+                const betweenContent =
+                  prevRow && renderBetweenRows
+                    ? renderBetweenRows(prevRow.original, row.original)
+                    : null
                 const rowClass = getRowClassName?.(row.original)
                 const baseClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
                 return (
-                <tr
-                  key={row.id}
-                  className={rowClass ? `${baseClass} ${rowClass}` : baseClass}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-sm text-gray-900">
-                      {cell.column.id === 'actions' ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </div>
-                      ) : (
-                        flexRender(cell.column.columnDef.cell, cell.getContext())
-                      )}
-                    </td>
-                  ))}
-                </tr>
+                <Fragment key={row.id}>
+                  {betweenContent && (
+                    <tr>
+                      <td colSpan={tableColumns.length} className="p-0">
+                        {betweenContent}
+                      </td>
+                    </tr>
+                  )}
+                  <tr className={rowClass ? `${baseClass} ${rowClass}` : baseClass}>
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-3 text-sm text-gray-900">
+                        {cell.column.id === 'actions' ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </div>
+                        ) : (
+                          flexRender(cell.column.columnDef.cell, cell.getContext())
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                </Fragment>
               )
               })
             )}
@@ -247,7 +259,12 @@ export default function SortableTable({
             {emptyMessage}
           </div>
         ) : (
-          rows.map((row) => {
+          rows.map((row, index) => {
+            const prevRow = index > 0 ? rows[index - 1] : null
+            const betweenContent =
+              prevRow && renderBetweenRows
+                ? renderBetweenRows(prevRow.original, row.original)
+                : null
             const titleCol = displayColumns.find((c) => c.key === (cardTitleKey ?? displayColumns[0]?.key)) ?? displayColumns[0]
             const subtitleCol = displayColumns[1]
             const excludedFromDetails = new Set([
@@ -271,8 +288,9 @@ export default function SortableTable({
                 : null
             const cardClass = getRowClassName?.(row.original)
             return (
+              <Fragment key={row.id}>
+              {betweenContent && betweenContent}
               <div
-                key={row.id}
                 className={`overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm ${cardClass ?? ''}`}
               >
                 <div className="flex items-start justify-between gap-2 border-b border-gray-100 px-4 py-3">
@@ -303,6 +321,7 @@ export default function SortableTable({
                   </div>
                 )}
               </div>
+              </Fragment>
             )
           })
         )}
