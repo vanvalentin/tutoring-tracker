@@ -8,29 +8,51 @@ DECLARE
   match_parts TEXT[];
   parsed_value NUMERIC;
   parsed_unit TEXT;
+  parsed_hours INTEGER;
+  parsed_minutes INTEGER;
+  normalized_text TEXT;
+  parse_target TEXT;
 BEGIN
   IF input_text IS NULL OR btrim(input_text) = '' THEN
     RETURN NULL;
   END IF;
 
+  normalized_text := lower(regexp_replace(btrim(input_text), '\s+', ' ', 'g'));
+  parse_target := regexp_replace(normalized_text, '(?:\s*\([^)]*\))+\s*$', '', 'g');
+
+  match_parts := regexp_match(parse_target, '^(\d{1,2}):(\d{2})$');
+
+  IF match_parts IS NOT NULL THEN
+    parsed_hours := match_parts[1]::INTEGER;
+    parsed_minutes := match_parts[2]::INTEGER;
+    RETURN (parsed_hours * 60) + parsed_minutes;
+  END IF;
+
   match_parts := regexp_match(
-    input_text,
-    '^(\d+(?:[.,]\d+)?)\s*(h(?:our|r)?s?|m(?:in(?:ute)?s?)?)$',
-    'i'
+    parse_target,
+    '^(\d+(?:[.,]\d+)?)\s*(h|hr|hrs|hour|hours)(?:\s+(\d+)\s*(m|min|mins|minute|minutes))?$'
   );
 
-  IF match_parts IS NULL THEN
-    RETURN NULL;
+  IF match_parts IS NOT NULL THEN
+    parsed_value := replace(match_parts[1], ',', '.')::NUMERIC;
+    parsed_minutes := COALESCE(match_parts[3]::INTEGER, 0);
+    RETURN round(parsed_value * 60)::INTEGER + parsed_minutes;
   END IF;
 
-  parsed_value := replace(match_parts[1], ',', '.')::NUMERIC;
-  parsed_unit := lower(match_parts[2]);
+  match_parts := regexp_match(
+    parse_target,
+    '^(\d+(?:[.,]\d+)?)\s*(m|min|mins|minute|minutes)$'
+  );
 
-  IF parsed_unit LIKE 'h%' THEN
-    RETURN round(parsed_value * 60)::INTEGER;
+  IF match_parts IS NOT NULL THEN
+    parsed_value := replace(match_parts[1], ',', '.')::NUMERIC;
+    parsed_unit := lower(match_parts[2]);
+    IF parsed_unit LIKE 'm%' THEN
+      RETURN round(parsed_value)::INTEGER;
+    END IF;
   END IF;
 
-  RETURN round(parsed_value)::INTEGER;
+  RETURN NULL;
 END;
 $$;
 
@@ -61,21 +83,34 @@ SET
   duration_minutes = COALESCE(duration_minutes, parse_legacy_duration_minutes(duration));
 
 DO $$
+DECLARE
+  bad_fee_labels TEXT;
+  bad_lesson_labels TEXT;
 BEGIN
+  SELECT string_agg(label, ', ' ORDER BY label)
+  INTO bad_fee_labels
+  FROM fees
+  WHERE duration_minutes IS NULL;
+
   IF EXISTS (
     SELECT 1
     FROM fees
     WHERE duration_minutes IS NULL
   ) THEN
-    RAISE EXCEPTION 'Fee duration migration failed: some fees could not be parsed into duration_minutes.';
+    RAISE EXCEPTION 'Fee duration migration failed. Unparseable fee labels: %', bad_fee_labels;
   END IF;
+
+  SELECT string_agg(fee_label, ', ' ORDER BY fee_label)
+  INTO bad_lesson_labels
+  FROM lessons
+  WHERE duration_minutes IS NULL;
 
   IF EXISTS (
     SELECT 1
     FROM lessons
     WHERE duration_minutes IS NULL
   ) THEN
-    RAISE EXCEPTION 'Lesson duration migration failed: some lessons could not be parsed into duration_minutes.';
+    RAISE EXCEPTION 'Lesson duration migration failed. Unparseable lesson labels: %', bad_lesson_labels;
   END IF;
 END;
 $$;
