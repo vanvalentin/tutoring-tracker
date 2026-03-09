@@ -8,10 +8,14 @@ import SearchableSelect from '../components/SearchableSelect'
 import SortableTable from '../components/SortableTable'
 import StatusBadge from '../components/StatusBadge'
 
+function formatFeeOptionLabel(fee) {
+  return `${fee.label} (${fee.fee} HKD, ${fee.durationMinutes} min)`
+}
+
 const COLUMNS = [
   { key: 'name', label: 'Student Name' },
   { key: 'location', label: 'District/Area' },
-  { key: 'defaultDuration', label: 'Default Fee', cell: (val) => val || '—' },
+  { key: 'defaultFeeLabel', label: 'Default Fee', cell: (val) => val || '—' },
   { key: 'address', label: 'Full Address' },
   { key: 'goal', label: 'Goal/Focus' },
   { key: 'paymentMethod', label: 'Payment method' },
@@ -40,7 +44,7 @@ export default function StudentsPage() {
     address: '',
     goal: '',
     paymentMethod: '',
-    defaultDuration: '',
+    defaultFeeId: '',
     notes: '',
     active: true,
   })
@@ -54,7 +58,7 @@ export default function StudentsPage() {
         address: '',
         goal: '',
         paymentMethod: '',
-        defaultDuration: '',
+        defaultFeeId: '',
         notes: '',
         active: true,
       })
@@ -70,7 +74,7 @@ export default function StudentsPage() {
       address: '',
       goal: '',
       paymentMethod: '',
-      defaultDuration: '',
+      defaultFeeId: '',
       notes: '',
       active: true,
     })
@@ -101,7 +105,7 @@ export default function StudentsPage() {
       address: student.address ?? '',
       goal: student.goal ?? '',
       paymentMethod: student.paymentMethod ?? '',
-      defaultDuration: student.defaultDuration ?? '',
+      defaultFeeId: student.defaultFeeId ?? '',
       notes: student.notes ?? '',
       active: student.active ?? true,
     })
@@ -123,8 +127,12 @@ export default function StudentsPage() {
   const paymentOptions = PAYMENT_METHODS
   const defaultFeeOptions = fees.map((f) => ({
     ...f,
-    label: `${f.duration} (${f.fee} HKD)`,
-    value: f.duration,
+    label: formatFeeOptionLabel(f),
+    value: f.id,
+  }))
+  const tableData = students.map((student) => ({
+    ...student,
+    defaultFeeLabel: fees.find((fee) => fee.id === student.defaultFeeId)?.label ?? '',
   }))
 
   return (
@@ -135,7 +143,7 @@ export default function StudentsPage() {
           variant="contained"
           onClick={() => {
             resetForm()
-            setFormData({ name: '', location: '', address: '', goal: '', paymentMethod: '', defaultDuration: '', notes: '', active: true })
+            setFormData({ name: '', location: '', address: '', goal: '', paymentMethod: '', defaultFeeId: '', notes: '', active: true })
             setModalOpen(true)
           }}
           sx={{ width: { xs: '100%', sm: 'auto' } }}
@@ -188,11 +196,11 @@ export default function StudentsPage() {
             />
             <SearchableSelect
               options={defaultFeeOptions}
-              value={formData.defaultDuration}
-              onChange={(v) => setFormData({ ...formData, defaultDuration: v })}
+              value={formData.defaultFeeId}
+              onChange={(v) => setFormData({ ...formData, defaultFeeId: v })}
               placeholder="Default fee (for new lessons)"
-              getOptionLabel={(opt) => opt.label ?? `${opt.duration} (${opt.fee} HKD)`}
-              getOptionValue={(opt) => opt.duration ?? opt.value}
+              getOptionLabel={(opt) => opt.label ?? formatFeeOptionLabel(opt)}
+              getOptionValue={(opt) => opt.id ?? opt.value}
             />
             <TextField
               label="Notes"
@@ -263,7 +271,7 @@ export default function StudentsPage() {
       ) : (
         <SortableTable
           columns={COLUMNS}
-          data={students}
+          data={tableData}
           emptyMessage="No students yet. Click Add Student to create one."
           searchPlaceholder="Search by name, location, goal..."
           cardTitleKey="name"

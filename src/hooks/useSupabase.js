@@ -13,7 +13,7 @@ function toAppStudent(row) {
     address: row.address,
     goal: row.goal,
     paymentMethod: row.payment_method,
-    defaultDuration: row.default_duration ?? null,
+    defaultFeeId: row.default_fee_id ?? null,
     notes: row.notes,
     active: row.active ?? true,
   }
@@ -23,7 +23,8 @@ function toAppFee(row) {
   if (!row) return null
   return {
     id: row.id,
-    duration: row.duration,
+    label: row.label,
+    durationMinutes: row.duration_minutes,
     fee: parseFloat(row.fee),
     description: row.description,
   }
@@ -36,7 +37,8 @@ function toAppLesson(row) {
     date: row.date,
     time: row.time ?? null,
     studentId: row.student_id,
-    duration: row.duration,
+    feeLabel: row.fee_label,
+    durationMinutes: row.duration_minutes,
     fee: parseFloat(row.fee),
     paid: row.paid ?? false,
     notes: row.notes,
@@ -108,7 +110,7 @@ export function useStudents() {
           address: student.address,
           goal: student.goal,
           payment_method: student.paymentMethod,
-          default_duration: (student.defaultDuration && student.defaultDuration.trim()) || null,
+          default_fee_id: student.defaultFeeId || null,
           notes: student.notes,
           active: student.active ?? true,
         })
@@ -131,7 +133,7 @@ export function useStudents() {
         address: updates.address,
         goal: updates.goal,
         payment_method: updates.paymentMethod,
-        default_duration: (updates.defaultDuration && updates.defaultDuration.trim()) || null,
+        default_fee_id: updates.defaultFeeId || null,
         notes: updates.notes,
         active: updates.active ?? true,
       })
@@ -188,7 +190,8 @@ export function useFees() {
         .from('fees')
         .insert({
           user_id: user.id,
-          duration: fee.duration,
+          label: fee.label,
+          duration_minutes: fee.durationMinutes,
           fee: fee.fee,
           description: fee.description,
         })
@@ -206,7 +209,8 @@ export function useFees() {
     const { data: row, error: err } = await supabase
       .from('fees')
       .update({
-        duration: updates.duration,
+        label: updates.label,
+        duration_minutes: updates.durationMinutes,
         fee: updates.fee,
         description: updates.description,
       })
@@ -261,7 +265,8 @@ export function useLessons() {
         user_id: user.id,
         date: lesson.date,
         student_id: lesson.studentId,
-        duration: lesson.duration,
+        fee_label: lesson.feeLabel,
+        duration_minutes: lesson.durationMinutes,
         fee: lesson.fee,
         paid: lesson.paid ?? false,
         notes: lesson.notes,
@@ -289,7 +294,8 @@ export function useLessons() {
           user_id: user.id,
           date: lesson.date,
           student_id: lesson.studentId,
-          duration: lesson.duration,
+          fee_label: lesson.feeLabel,
+          duration_minutes: lesson.durationMinutes,
           fee: lesson.fee,
           paid: lesson.paid ?? false,
           notes: lesson.notes ?? '',
@@ -316,7 +322,8 @@ export function useLessons() {
     if (updates.date !== undefined) dbUpdates.date = updates.date
     if (updates.time !== undefined) dbUpdates.time = updates.time
     if (updates.studentId !== undefined) dbUpdates.student_id = updates.studentId
-    if (updates.duration !== undefined) dbUpdates.duration = updates.duration
+    if (updates.feeLabel !== undefined) dbUpdates.fee_label = updates.feeLabel
+    if (updates.durationMinutes !== undefined) dbUpdates.duration_minutes = updates.durationMinutes
     if (updates.fee !== undefined) dbUpdates.fee = updates.fee
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes
     if (updates.status !== undefined) dbUpdates.status = updates.status

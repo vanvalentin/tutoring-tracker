@@ -66,9 +66,11 @@ export default function Layout({ children }) {
           <div className="flex h-14 items-center justify-between gap-4">
             {/* Brand */}
             <div className="flex shrink-0 items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-800 text-sm font-medium text-white">
-                T
-              </div>
+              <img
+                src="/logo.png"
+                alt="Tutoring Tracker logo"
+                className="h-10 w-10 rounded-lg border border-gray-200 bg-white object-cover shadow-sm"
+              />
               <span className="text-lg font-semibold text-gray-800">Tutoring Tracker</span>
             </div>
 

@@ -29,6 +29,11 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 shadow">
+        <img
+          src="/logo.png"
+          alt="Tutoring Tracker logo"
+          className="mx-auto mb-4 h-24 w-24 rounded-2xl border border-gray-200 object-cover shadow-sm"
+        />
         <h1 className="mb-2 text-center text-xl font-semibold text-gray-900">
           Tutoring Tracker
         </h1>

@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS students (
   address TEXT,
   goal TEXT,
   payment_method TEXT,
-  default_duration TEXT,
+  default_fee_id UUID,
   notes TEXT,
   active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS students (
 CREATE TABLE IF NOT EXISTS fees (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  duration TEXT NOT NULL,
+  label TEXT NOT NULL,
+  duration_minutes INTEGER NOT NULL,
   fee DECIMAL(10,2) NOT NULL,
   description TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
@@ -35,7 +36,8 @@ CREATE TABLE IF NOT EXISTS lessons (
   date DATE NOT NULL,
   time TIME,
   student_id UUID REFERENCES students(id) ON DELETE SET NULL,
-  duration TEXT NOT NULL,
+  fee_label TEXT NOT NULL,
+  duration_minutes INTEGER NOT NULL,
   fee DECIMAL(10,2) NOT NULL,
   paid BOOLEAN DEFAULT false,
   notes TEXT,
@@ -65,6 +67,20 @@ CREATE TABLE IF NOT EXISTS material (
   note TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'students_default_fee_id_fkey'
+  ) THEN
+    ALTER TABLE students
+      ADD CONSTRAINT students_default_fee_id_fkey
+      FOREIGN KEY (default_fee_id) REFERENCES fees(id) ON DELETE SET NULL;
+  END IF;
+END;
+$$;
 
 -- Enable Row Level Security
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;

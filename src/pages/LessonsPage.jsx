@@ -46,6 +46,8 @@ const WEEKDAYS = [
   { value: 0, label: 'Sunday' },
 ]
 
+const CUSTOM_DURATION_VALUE = '__custom_duration__'
+
 /** Convert "HH:MM" to total minutes from midnight */
 function timeToMinutes(timeStr) {
   if (!timeStr) return null
@@ -53,14 +55,9 @@ function timeToMinutes(timeStr) {
   return h * 60 + (m || 0)
 }
 
-/** Parse duration strings like "1 hour", "1.5 hours", "90 minutes" into minutes */
-function parseDurationMinutes(durationStr) {
-  if (!durationStr) return 0
-  const match = durationStr.match(/(\d+(?:[.,]\d+)?)\s*(h(?:our|r)?s?|m(?:in(?:ute)?s?)?)/i)
-  if (!match) return 0
-  const num = parseFloat(match[1].replace(',', '.'))
-  const unit = match[2].toLowerCase()
-  return unit.startsWith('h') ? Math.round(num * 60) : Math.round(num)
+function getDurationMinutes(lesson) {
+  const minutes = Number(lesson?.durationMinutes)
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : null
 }
 
 /**
@@ -71,7 +68,9 @@ function getGapMinutes(prevLesson, currLesson) {
   const prevStart = timeToMinutes(prevLesson.time)
   const currStart = timeToMinutes(currLesson.time)
   if (prevStart == null || currStart == null) return null
-  const prevEnd = prevStart + parseDurationMinutes(prevLesson.duration)
+  const prevDurationMinutes = getDurationMinutes(prevLesson)
+  if (prevDurationMinutes == null) return null
+  const prevEnd = prevStart + prevDurationMinutes
   return currStart - prevEnd
 }
 
@@ -85,6 +84,37 @@ function formatTime(timeStr) {
   if (!timeStr) return '-'
   const [h, m] = timeStr.split(':')
   return `${h.padStart(2, '0')}:${(m || '00').padStart(2, '0')}`
+}
+
+function formatDurationMinutes(minutes) {
+  const parsed = Number(minutes)
+  if (!Number.isFinite(parsed) || parsed <= 0) return '-'
+  return `${parsed} min`
+}
+
+function formatFeeOptionLabel(fee) {
+  return `${fee.label} (${fee.fee} HKD, ${formatDurationMinutes(fee.durationMinutes)})`
+}
+
+function findFeeById(fees, feeId) {
+  return fees.find((fee) => fee.id === feeId) ?? null
+}
+
+function findMatchingFee(fees, lessonLike) {
+  const durationMinutes = getDurationMinutes(lessonLike)
+  if (!lessonLike?.feeLabel || durationMinutes == null || lessonLike?.fee == null) return null
+  return fees.find((fee) =>
+    fee.label === lessonLike.feeLabel &&
+    Number(fee.durationMinutes) === durationMinutes &&
+    Number(fee.fee) === Number(lessonLike.fee)
+  ) ?? null
+}
+
+function getFeeSelectValue(fees, lessonLike) {
+  if (!lessonLike) return ''
+  if (lessonLike.selectedFeeId) return lessonLike.selectedFeeId
+  if (!lessonLike.feeLabel && !lessonLike.durationMinutes && !lessonLike.fee) return ''
+  return findMatchingFee(fees, lessonLike)?.id ?? CUSTOM_DURATION_VALUE
 }
 
 /** Get all dates in a month that fall on the given weekday (0=Sun, 1=Mon, ..., 6=Sat) */
@@ -127,7 +157,8 @@ const COLUMNS = [
       </div>
     ),
   },
-  { key: 'duration', label: 'Duration' },
+  { key: 'feeLabel', label: 'Fee Label' },
+  { key: 'durationMinutes', label: 'Duration', cell: (val) => formatDurationMinutes(val) },
   { key: 'fee', label: 'Fee (HKD)' },
   {
     key: 'paid',
@@ -162,7 +193,9 @@ const resetFormData = (mode = 'recurring') => ({
   weekday: 1,
   monthYear: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
   studentId: '',
-  duration: '',
+  selectedFeeId: '',
+  feeLabel: '',
+  durationMinutes: '',
   fee: '',
   paid: false,
   notes: '',
@@ -203,13 +236,24 @@ export default function LessonsPage() {
 
   const activeStudents = students.filter((s) => s.active !== false)
 
-  const handleDurationChange = (duration) => {
-    const feeEntry = fees.find((f) => f.duration === duration)
-    setFormData({
-      ...formData,
-      duration,
-      fee: feeEntry ? String(feeEntry.fee) : '',
-    })
+  const handleFeeChange = (feeId) => {
+    if (feeId === CUSTOM_DURATION_VALUE) {
+      setFormData((prev) => ({
+        ...prev,
+        selectedFeeId: CUSTOM_DURATION_VALUE,
+      }))
+      return
+    }
+
+    const feeEntry = findFeeById(fees, feeId)
+    if (!feeEntry) return
+    setFormData((prev) => ({
+      ...prev,
+      selectedFeeId: feeEntry.id,
+      feeLabel: feeEntry.label,
+      durationMinutes: String(feeEntry.durationMinutes),
+      fee: String(feeEntry.fee),
+    }))
   }
 
   const recurringDates = useMemo(() => {
@@ -225,8 +269,9 @@ export default function LessonsPage() {
 
   const handleProceedToConfirm = (e) => {
     e.preventDefault()
+    const durationMinutes = parseInt(formData.durationMinutes, 10)
     const feeNum = parseFloat(formData.fee)
-    if (!formData.studentId || !formData.duration || isNaN(feeNum)) return
+    if (!formData.studentId || !formData.feeLabel.trim() || !Number.isInteger(durationMinutes) || durationMinutes <= 0 || isNaN(feeNum)) return
     if (formData.mode === 'recurring' && recurringDates.length === 0) return
 
     if (formData.mode === 'single') {
@@ -235,7 +280,9 @@ export default function LessonsPage() {
           date: formData.date,
           time: formData.time || '',
           studentId: formData.studentId,
-          duration: formData.duration,
+          selectedFeeId: formData.selectedFeeId,
+          feeLabel: formData.feeLabel.trim(),
+          durationMinutes,
           fee: feeNum,
           paid: formData.paid,
           notes: formData.notes,
@@ -247,7 +294,9 @@ export default function LessonsPage() {
           date,
           time: formData.time || '',
           studentId: formData.studentId,
-          duration: formData.duration,
+          selectedFeeId: formData.selectedFeeId,
+          feeLabel: formData.feeLabel.trim(),
+          durationMinutes,
           fee: feeNum,
           paid: false,
           notes: formData.notes,
@@ -276,7 +325,8 @@ export default function LessonsPage() {
           date: l.date,
           time: l.time || undefined,
           studentId: l.studentId,
-          duration: l.duration,
+          feeLabel: l.feeLabel,
+          durationMinutes: l.durationMinutes,
           fee: l.fee,
           paid: l.paid,
           notes: l.notes,
@@ -287,7 +337,8 @@ export default function LessonsPage() {
             date: l.date,
             time: l.time || undefined,
             studentId: l.studentId,
-            duration: l.duration,
+            feeLabel: l.feeLabel,
+            durationMinutes: l.durationMinutes,
             fee: l.fee,
             paid: l.paid,
             notes: l.notes,
@@ -310,21 +361,26 @@ export default function LessonsPage() {
   }
 
   const handleEditLesson = (lesson) => {
-    setEditingLesson(lesson)
+    setEditingLesson({
+      ...lesson,
+      selectedFeeId: getFeeSelectValue(fees, lesson),
+    })
     setModalOpen(true)
   }
 
   const handleSaveEdit = async (e) => {
     e.preventDefault()
     if (!editingLesson) return
+    const durationMinutes = parseInt(editingLesson.durationMinutes, 10)
     const feeNum = parseFloat(editingLesson.fee)
-    if (!editingLesson.studentId || !editingLesson.duration || isNaN(feeNum)) return
+    if (!editingLesson.studentId || !editingLesson.feeLabel?.trim() || !Number.isInteger(durationMinutes) || durationMinutes <= 0 || isNaN(feeNum)) return
     try {
       await update(editingLesson.id, {
         date: editingLesson.date,
         time: editingLesson.time || undefined,
         studentId: editingLesson.studentId,
-        duration: editingLesson.duration,
+        feeLabel: editingLesson.feeLabel.trim(),
+        durationMinutes,
         fee: feeNum,
         notes: editingLesson.notes ?? '',
       })
@@ -378,6 +434,14 @@ export default function LessonsPage() {
   const getStudent = (studentId) =>
     students.find((s) => s.id === studentId) ?? null
 
+  const getFee = (feeId) =>
+    fees.find((fee) => fee.id === feeId) ?? null
+
+  const getFeeSummary = (feeId) => {
+    const fee = getFee(feeId)
+    return fee ? formatFeeOptionLabel(fee) : ''
+  }
+
   const tableData = lessons
     .slice()
     .sort((a, b) => {
@@ -425,7 +489,12 @@ export default function LessonsPage() {
   }, [tableData, quickFilter])
 
   const studentOptions = activeStudents.map((s) => ({ ...s, label: s.name, value: s.id }))
-  const feeOptions = fees.map((f) => ({ ...f, label: f.duration, value: f.duration }))
+  const feeOptions = [
+    ...fees.map((f) => ({ ...f, optionLabel: formatFeeOptionLabel(f), value: f.id })),
+    { id: CUSTOM_DURATION_VALUE, value: CUSTOM_DURATION_VALUE, optionLabel: 'Custom fee', label: 'Custom fee' },
+  ]
+  const formFeeSelectValue = getFeeSelectValue(fees, formData)
+  const editingFeeSelectValue = getFeeSelectValue(fees, editingLesson)
 
   return (
     <div className="space-y-6">
@@ -483,7 +552,7 @@ export default function LessonsPage() {
               <Typography variant="caption" color="text.secondary" display="block">
                 Default fee
               </Typography>
-              <Typography variant="body2">{studentPopupStudent.defaultDuration || '—'}</Typography>
+              <Typography variant="body2">{getFeeSummary(studentPopupStudent.defaultFeeId) || '—'}</Typography>
             </Box>
             {studentPopupStudent.notes && (
               <Box>
@@ -542,19 +611,53 @@ export default function LessonsPage() {
             </Box>
             <SearchableSelect
               options={feeOptions}
-              value={editingLesson.duration}
+              value={editingFeeSelectValue}
               onChange={(v) => {
-                const feeEntry = fees.find((f) => f.duration === v)
+                if (v === CUSTOM_DURATION_VALUE) {
+                  updateEditingLesson({
+                    selectedFeeId: CUSTOM_DURATION_VALUE,
+                  })
+                  return
+                }
+
+                const feeEntry = findFeeById(fees, v)
+                if (!feeEntry) return
                 updateEditingLesson({
-                  duration: v,
-                  fee: feeEntry ? feeEntry.fee : editingLesson.fee,
+                  selectedFeeId: feeEntry.id,
+                  feeLabel: feeEntry.label,
+                  durationMinutes: String(feeEntry.durationMinutes),
+                  fee: feeEntry.fee,
                 })
               }}
-              placeholder="Select duration..."
-              getOptionLabel={(opt) => opt.duration ?? opt.label}
-              getOptionValue={(opt) => opt.duration ?? opt.value}
+              placeholder="Select fee..."
+              getOptionLabel={(opt) => opt.optionLabel ?? opt.label}
+              getOptionValue={(opt) => opt.id ?? opt.value}
               size="small"
             />
+            {editingFeeSelectValue === CUSTOM_DURATION_VALUE && (
+              <>
+                <TextField
+                  label="Fee Label"
+                  value={editingLesson.feeLabel ?? ''}
+                  onChange={(e) => updateEditingLesson({ feeLabel: e.target.value, selectedFeeId: CUSTOM_DURATION_VALUE })}
+                  placeholder="e.g. Intensive mock exam session"
+                  size="small"
+                  fullWidth
+                  required
+                />
+                <TextField
+                  label="Duration (minutes)"
+                  type="number"
+                  value={editingLesson.durationMinutes ?? ''}
+                  onChange={(e) => updateEditingLesson({ durationMinutes: e.target.value, selectedFeeId: CUSTOM_DURATION_VALUE })}
+                  placeholder="75"
+                  inputProps={{ min: 1, step: 1 }}
+                  size="small"
+                  fullWidth
+                  required
+                />
+              </>
+            )}
             <TextField
               label="Fee (HKD)"
               type="number"
@@ -596,12 +699,13 @@ export default function LessonsPage() {
               value={formData.studentId}
               onChange={(v) => {
                 const student = activeStudents.find((s) => s.id === v)
-                const defaultDuration = student?.defaultDuration
-                const feeEntry = defaultDuration ? fees.find((f) => f.duration === defaultDuration) : null
+                const feeEntry = student?.defaultFeeId ? findFeeById(fees, student.defaultFeeId) : null
                 setFormData({
                   ...formData,
                   studentId: v,
-                  duration: defaultDuration || formData.duration,
+                  selectedFeeId: feeEntry ? feeEntry.id : formData.selectedFeeId,
+                  feeLabel: feeEntry ? feeEntry.label : formData.feeLabel,
+                  durationMinutes: feeEntry ? String(feeEntry.durationMinutes) : formData.durationMinutes,
                   fee: feeEntry ? String(feeEntry.fee) : formData.fee,
                 })
               }}
@@ -611,12 +715,34 @@ export default function LessonsPage() {
             />
             <SearchableSelect
               options={feeOptions}
-              value={formData.duration}
-              onChange={(v) => handleDurationChange(v)}
-              placeholder="Select duration..."
-              getOptionLabel={(opt) => opt.duration ?? opt.label}
-              getOptionValue={(opt) => opt.duration ?? opt.value}
+              value={formFeeSelectValue}
+              onChange={(v) => handleFeeChange(v)}
+              placeholder="Select fee..."
+              getOptionLabel={(opt) => opt.optionLabel ?? opt.label}
+              getOptionValue={(opt) => opt.id ?? opt.value}
             />
+            {formFeeSelectValue === CUSTOM_DURATION_VALUE && (
+              <>
+                <TextField
+                  label="Fee Label"
+                  value={formData.feeLabel}
+                  onChange={(e) => setFormData({ ...formData, selectedFeeId: CUSTOM_DURATION_VALUE, feeLabel: e.target.value })}
+                  placeholder="e.g. Intensive mock exam session"
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Duration (minutes)"
+                  type="number"
+                  value={formData.durationMinutes}
+                  onChange={(e) => setFormData({ ...formData, selectedFeeId: CUSTOM_DURATION_VALUE, durationMinutes: e.target.value })}
+                  placeholder="75"
+                  inputProps={{ min: 1, step: 1 }}
+                  required
+                  fullWidth
+                />
+              </>
+            )}
             <TextField
               label="Fee (HKD)"
               type="number"
@@ -746,12 +872,16 @@ export default function LessonsPage() {
               const pendingStart = timeToMinutes(lesson.time)
               const pendingEnd =
                 pendingStart != null
-                  ? pendingStart + parseDurationMinutes(lesson.duration)
+                  ? pendingStart + (getDurationMinutes(lesson) ?? 0)
                   : null
 
               const lessonBefore = lesson.time
                 ? sameDayExisting.findLast(
-                    (l) => timeToMinutes(l.time) + parseDurationMinutes(l.duration) <= (pendingStart ?? Infinity)
+                    (l) => {
+                      const lessonStart = timeToMinutes(l.time)
+                      const lessonDurationMinutes = getDurationMinutes(l)
+                      return lessonStart != null && lessonDurationMinutes != null && lessonStart + lessonDurationMinutes <= (pendingStart ?? Infinity)
+                    }
                   )
                 : null
               const lessonAfter = lesson.time
@@ -867,20 +997,54 @@ export default function LessonsPage() {
                       </Box>
                       <SearchableSelect
                         options={feeOptions}
-                        value={lesson.duration}
+                        value={getFeeSelectValue(fees, lesson)}
                         onChange={(v) => {
-                          const feeEntry = fees.find((f) => f.duration === v)
+                          if (v === CUSTOM_DURATION_VALUE) {
+                            updatePendingLesson(index, {
+                              selectedFeeId: CUSTOM_DURATION_VALUE,
+                            })
+                            return
+                          }
+
+                          const feeEntry = findFeeById(fees, v)
+                          if (!feeEntry) return
                           updatePendingLesson(index, {
-                            duration: v,
-                            fee: feeEntry ? feeEntry.fee : lesson.fee,
+                            selectedFeeId: feeEntry.id,
+                            feeLabel: feeEntry.label,
+                            durationMinutes: feeEntry.durationMinutes,
+                            fee: feeEntry.fee,
                           })
                         }}
-                        placeholder="Select duration..."
-                        getOptionLabel={(opt) => opt.duration ?? opt.label}
-                        getOptionValue={(opt) => opt.duration ?? opt.value}
+                        placeholder="Select fee..."
+                        getOptionLabel={(opt) => opt.optionLabel ?? opt.label}
+                        getOptionValue={(opt) => opt.id ?? opt.value}
                         size="small"
                         fullWidth
                       />
+                      {getFeeSelectValue(fees, lesson) === CUSTOM_DURATION_VALUE && (
+                        <>
+                          <TextField
+                            label="Fee Label"
+                            value={lesson.feeLabel ?? ''}
+                            onChange={(e) => updatePendingLesson(index, { feeLabel: e.target.value, selectedFeeId: CUSTOM_DURATION_VALUE })}
+                            placeholder="e.g. Intensive mock exam session"
+                            size="small"
+                            fullWidth
+                            required
+                          />
+                          <TextField
+                            label="Duration (minutes)"
+                            type="number"
+                            value={lesson.durationMinutes ?? ''}
+                            onChange={(e) => updatePendingLesson(index, { durationMinutes: parseInt(e.target.value, 10) || '', selectedFeeId: CUSTOM_DURATION_VALUE })}
+                            placeholder="75"
+                            inputProps={{ min: 1, step: 1 }}
+                            size="small"
+                            fullWidth
+                            required
+                          />
+                        </>
+                      )}
                       <TextField
                         label="Fee (HKD)"
                         type="number"
@@ -908,7 +1072,10 @@ export default function LessonsPage() {
                           <strong>Date:</strong> {formatDate(lesson.date)} · <strong>Time:</strong> {formatTime(lesson.time)}
                         </Typography>
                         <Typography variant="body2">
-                          <strong>Duration:</strong> {lesson.duration || '—'} · <strong>Fee:</strong> {lesson.fee ? `${lesson.fee} HKD` : '—'}
+                          <strong>Fee label:</strong> {lesson.feeLabel || '—'} · <strong>Duration:</strong> {formatDurationMinutes(lesson.durationMinutes)}
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Fee:</strong> {lesson.fee ? `${lesson.fee} HKD` : '—'}
                         </Typography>
                         {lesson.notes && (
                           <Typography variant="body2">
@@ -957,7 +1124,8 @@ export default function LessonsPage() {
                   <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Date: </Box>{formatDate(lesson.date)}<br />
                   <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Time: </Box>{formatTime(lesson.time)}<br />
                   <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Student: </Box>{getStudentName(lesson.studentId) || '—'}<br />
-                  {lesson.duration && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Duration: </Box>{lesson.duration}<br /></>}
+                  {lesson.feeLabel && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Fee label: </Box>{lesson.feeLabel}<br /></>}
+                  {lesson.durationMinutes != null && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Duration: </Box>{formatDurationMinutes(lesson.durationMinutes)}<br /></>}
                   {lesson.fee != null && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Fee: </Box>{lesson.fee} HKD</>}
                 </Typography>
               </Box>
@@ -998,7 +1166,8 @@ export default function LessonsPage() {
                 <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Date: </Box>{formatDate(confirmDeleteLesson.date)}<br />
                 <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Time: </Box>{formatTime(confirmDeleteLesson.time)}<br />
                 <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Student: </Box>{confirmDeleteLesson._studentName ?? '—'}<br />
-                {confirmDeleteLesson.duration && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Duration: </Box>{confirmDeleteLesson.duration}<br /></>}
+                {confirmDeleteLesson.feeLabel && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Fee label: </Box>{confirmDeleteLesson.feeLabel}<br /></>}
+                {confirmDeleteLesson.durationMinutes != null && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Duration: </Box>{formatDurationMinutes(confirmDeleteLesson.durationMinutes)}<br /></>}
                 {confirmDeleteLesson.fee != null && <><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Fee: </Box>{confirmDeleteLesson.fee} HKD</>}
               </Typography>
             </Box>

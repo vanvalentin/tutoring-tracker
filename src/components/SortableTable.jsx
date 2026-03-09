@@ -7,7 +7,7 @@ import {
   flexRender,
   createColumnHelper,
 } from '@tanstack/react-table'
-import { useState, useMemo, Fragment } from 'react'
+import { useState, useMemo, useEffect, Fragment } from 'react'
 import { TextField, Select, MenuItem, FormControl, InputLabel, Box } from '@mui/material'
 import fuzzysort from 'fuzzysort'
 
@@ -86,6 +86,7 @@ export default function SortableTable({
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: setPagination,
+    autoResetPageIndex: false,
     globalFilterFn: fuzzyGlobalFilterFn,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -99,6 +100,16 @@ export default function SortableTable({
   const filteredCount = table.getFilteredRowModel().rows.length
   const start = filteredCount === 0 ? 0 : pageIndex * pageSize + 1
   const end = Math.min((pageIndex + 1) * pageSize, filteredCount)
+
+  useEffect(() => {
+    setPagination((prev) => {
+      const lastPageIndex = Math.max(pageCount - 1, 0)
+      const nextPageIndex = Math.min(prev.pageIndex, lastPageIndex)
+      return nextPageIndex === prev.pageIndex
+        ? prev
+        : { ...prev, pageIndex: nextPageIndex }
+    })
+  }, [pageCount])
 
   const getCellValue = (row, col) => {
     const cell = row.getVisibleCells().find((c) => c.column.id === col.key)
@@ -116,7 +127,10 @@ export default function SortableTable({
           <TextField
             placeholder={searchPlaceholder}
             value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
+            onChange={(e) => {
+              setGlobalFilter(e.target.value)
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+            }}
             size="small"
             fullWidth
           />

@@ -5,7 +5,8 @@ import Modal from '../components/Modal'
 import SortableTable from '../components/SortableTable'
 
 const COLUMNS = [
-  { key: 'duration', label: 'Lesson Duration' },
+  { key: 'label', label: 'Fee Label' },
+  { key: 'durationMinutes', label: 'Duration', cell: (val) => `${val} min` },
   { key: 'fee', label: 'Fee (HKD)' },
   { key: 'description', label: 'Description' },
 ]
@@ -16,33 +17,37 @@ export default function FeesPage() {
   const [editingId, setEditingId] = useState(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState(null)
   const [formData, setFormData] = useState({
-    duration: '',
+    label: '',
+    durationMinutes: '',
     fee: '',
     description: '',
   })
 
   const resetForm = () => {
-    setFormData({ duration: '', fee: '', description: '' })
+    setFormData({ label: '', durationMinutes: '', fee: '', description: '' })
     setEditingId(null)
     setModalOpen(false)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const durationMinutes = parseInt(formData.durationMinutes, 10)
     const feeNum = parseFloat(formData.fee)
-    if (!formData.duration.trim() || isNaN(feeNum)) return
+    if (!formData.label.trim() || !Number.isInteger(durationMinutes) || durationMinutes <= 0 || isNaN(feeNum)) return
     try {
       if (editingId) {
         await update(editingId, {
-          duration: formData.duration,
+          label: formData.label.trim(),
+          durationMinutes,
           fee: feeNum,
-          description: formData.description,
+          description: formData.description.trim(),
         })
       } else {
         await add({
-          duration: formData.duration,
+          label: formData.label.trim(),
+          durationMinutes,
           fee: feeNum,
-          description: formData.description,
+          description: formData.description.trim(),
         })
       }
       resetForm()
@@ -54,7 +59,8 @@ export default function FeesPage() {
   const handleEdit = (fee) => {
     setEditingId(fee.id)
     setFormData({
-      duration: fee.duration,
+      label: fee.label,
+      durationMinutes: String(fee.durationMinutes),
       fee: String(fee.fee),
       description: fee.description ?? '',
     })
@@ -79,7 +85,7 @@ export default function FeesPage() {
           variant="contained"
           onClick={() => {
             resetForm()
-            setFormData({ duration: '', fee: '', description: '' })
+            setFormData({ label: '', durationMinutes: '', fee: '', description: '' })
             setModalOpen(true)
           }}
           sx={{ width: { xs: '100%', sm: 'auto' } }}
@@ -96,10 +102,20 @@ export default function FeesPage() {
         <form onSubmit={handleSubmit}>
           <Stack spacing={2}>
             <TextField
-              label="Lesson Duration"
-              value={formData.duration}
-              onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-              placeholder="e.g. 1.0 hour"
+              label="Fee Label"
+              value={formData.label}
+              onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+              placeholder="e.g. Standard 90-minute lesson"
+              required
+              fullWidth
+            />
+            <TextField
+              label="Duration (minutes)"
+              type="number"
+              value={formData.durationMinutes}
+              onChange={(e) => setFormData({ ...formData, durationMinutes: e.target.value })}
+              placeholder="90"
+              inputProps={{ min: 1, step: 1 }}
               required
               fullWidth
             />
@@ -146,7 +162,8 @@ export default function FeesPage() {
           {confirmDeleteItem && (
             <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1, bgcolor: 'grey.100' }}>
               <Typography variant="body2" component="div">
-                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Duration: </Box>{confirmDeleteItem.duration}<br />
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Fee label: </Box>{confirmDeleteItem.label}<br />
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Duration: </Box>{confirmDeleteItem.durationMinutes} min<br />
                 <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Fee: </Box>{confirmDeleteItem.fee} HKD
                 {confirmDeleteItem.description?.trim() && (
                   <><br /><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Description: </Box>{confirmDeleteItem.description}</>
@@ -175,8 +192,8 @@ export default function FeesPage() {
           columns={COLUMNS}
           data={fees}
           emptyMessage="No fee entries yet. Click Add Fee to create one."
-          searchPlaceholder="Search by duration, description..."
-          cardTitleKey="duration"
+          searchPlaceholder="Search by fee label or description..."
+          cardTitleKey="label"
           renderActions={(row) => (
             <>
               <Button size="small" onClick={() => handleEdit(row)}>
