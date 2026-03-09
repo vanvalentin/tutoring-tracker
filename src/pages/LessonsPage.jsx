@@ -157,8 +157,7 @@ const COLUMNS = [
       </div>
     ),
   },
-  { key: 'feeLabel', label: 'Fee Label' },
-  { key: 'durationMinutes', label: 'Duration', cell: (val) => formatDurationMinutes(val) },
+  { key: 'feeLabel', label: 'Type' },
   { key: 'fee', label: 'Fee (HKD)' },
   {
     key: 'paid',
