@@ -71,6 +71,25 @@ function toAppMaterial(row) {
   }
 }
 
+function toAppPersonalExpense(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    date: row.date,
+    description: row.description,
+    amount: parseFloat(row.amount),
+    category: row.category,
+    vendor: row.vendor,
+    note: row.note,
+  }
+}
+
+function normalizeOptionalText(value) {
+  if (value === undefined) return undefined
+  const trimmed = typeof value === 'string' ? value.trim() : value
+  return trimmed === '' ? null : trimmed
+}
+
 export function useStudents() {
   const { user } = useAuth()
   const [data, setData] = useState([])
@@ -497,6 +516,86 @@ export function useMaterial() {
 
   const remove = useCallback(async (id) => {
     await supabase.from('material').delete().eq('id', id)
+    setData((prev) => prev.filter((x) => x.id !== id))
+  }, [])
+
+  return { data, loading, error, refetch: fetch, add, update, remove }
+}
+
+export function usePersonalExpenses() {
+  const { user } = useAuth()
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetch = useCallback(async () => {
+    if (!user?.id) return
+    setLoading(true)
+    try {
+      const { data: rows, error: err } = await supabase
+        .from('personal_expenses')
+        .select('*')
+        .order('date', { ascending: false })
+      if (err) throw err
+      setData((rows || []).map(toAppPersonalExpense))
+    } catch (e) {
+      setError(e.message)
+      setData([])
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    fetch()
+  }, [fetch])
+
+  const add = useCallback(
+    async (expense) => {
+      const insertRow = {
+        user_id: user.id,
+        amount: expense.amount,
+        description: normalizeOptionalText(expense.description),
+        category: normalizeOptionalText(expense.category),
+        vendor: normalizeOptionalText(expense.vendor),
+        note: normalizeOptionalText(expense.note),
+      }
+      if (expense.date) insertRow.date = expense.date
+      const { data: row, error: err } = await supabase
+        .from('personal_expenses')
+        .insert(insertRow)
+        .select()
+        .single()
+      if (err) throw err
+      const appExpense = toAppPersonalExpense(row)
+      setData((prev) => [appExpense, ...prev])
+      return appExpense
+    },
+    [user?.id]
+  )
+
+  const update = useCallback(async (id, updates) => {
+    const dbUpdates = {}
+    if (updates.date !== undefined) dbUpdates.date = updates.date
+    if (updates.description !== undefined) dbUpdates.description = normalizeOptionalText(updates.description)
+    if (updates.amount !== undefined) dbUpdates.amount = updates.amount
+    if (updates.category !== undefined) dbUpdates.category = normalizeOptionalText(updates.category)
+    if (updates.vendor !== undefined) dbUpdates.vendor = normalizeOptionalText(updates.vendor)
+    if (updates.note !== undefined) dbUpdates.note = normalizeOptionalText(updates.note)
+    const { data: row, error: err } = await supabase
+      .from('personal_expenses')
+      .update(dbUpdates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (err) throw err
+    const appExpense = toAppPersonalExpense(row)
+    setData((prev) => prev.map((x) => (x.id === id ? appExpense : x)))
+    return appExpense
+  }, [])
+
+  const remove = useCallback(async (id) => {
+    await supabase.from('personal_expenses').delete().eq('id', id)
     setData((prev) => prev.filter((x) => x.id !== id))
   }, [])
 

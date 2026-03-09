@@ -18,6 +18,7 @@ import HomePage from './pages/HomePage'
 import LessonsPage from './pages/LessonsPage'
 import TransportationPage from './pages/TransportationPage'
 import MaterialPage from './pages/MaterialPage'
+import PersonalExpensesPage from './pages/PersonalExpensesPage'
 import StatsPage from './pages/StatsPage'
 import FeesPage from './pages/FeesPage'
 import StudentsPage from './pages/StudentsPage'
@@ -36,6 +37,7 @@ function AppRoutes() {
                 <Route path="/lessons" element={<LessonsPage />} />
                 <Route path="/transportation" element={<TransportationPage />} />
                 <Route path="/material" element={<MaterialPage />} />
+                <Route path="/personal-expenses" element={<PersonalExpensesPage />} />
                 <Route path="/stats" element={<StatsPage />} />
                 <Route path="/fees" element={<FeesPage />} />
                 <Route path="/students" element={<StudentsPage />} />

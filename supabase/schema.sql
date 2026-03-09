@@ -68,6 +68,18 @@ CREATE TABLE IF NOT EXISTS material (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS personal_expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  description TEXT,
+  amount DECIMAL(10,2) NOT NULL,
+  category TEXT,
+  vendor TEXT,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -88,6 +100,7 @@ ALTER TABLE fees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lessons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transportation ENABLE ROW LEVEL SECURITY;
 ALTER TABLE material ENABLE ROW LEVEL SECURITY;
+ALTER TABLE personal_expenses ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing permissive policies if migrating from old schema
 DROP POLICY IF EXISTS "Allow all for students" ON students;
@@ -95,6 +108,7 @@ DROP POLICY IF EXISTS "Allow all for fees" ON fees;
 DROP POLICY IF EXISTS "Allow all for lessons" ON lessons;
 DROP POLICY IF EXISTS "Allow all for transportation" ON transportation;
 DROP POLICY IF EXISTS "Allow all for material" ON material;
+DROP POLICY IF EXISTS "Allow all for personal_expenses" ON personal_expenses;
 
 -- RLS: Users can only access their own data
 CREATE POLICY "Users can manage own students" ON students
@@ -110,6 +124,9 @@ CREATE POLICY "Users can manage own transportation" ON transportation
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can manage own material" ON material
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage own personal_expenses" ON personal_expenses
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- Migration: Add user_id to existing tables (run if upgrading from schema without user_id)

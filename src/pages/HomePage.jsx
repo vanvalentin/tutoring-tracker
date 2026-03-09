@@ -6,7 +6,8 @@ import { useLessons } from '../hooks/useSupabase'
 const QUICK_ADD_BUTTONS = [
   { path: '/lessons', label: 'Add Lesson', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
   { path: '/transportation', label: 'Add Transport', icon: 'M8 17a2 2 0 11-4 0 2 2 0 014 0zM16 17a2 2 0 11-4 0 2 2 0 014 0zM5 11l1.5-4.5h11L19 11v5a1 1 0 01-1 1H4a1 1 0 01-1-1v-5z' },
-  { path: '/material', label: 'Add Material', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+  { path: '/material', label: 'Add Business Expense', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+  { path: '/personal-expenses', label: 'Add Personal Expense', icon: 'M3 7h18M7 7V5a2 2 0 012-2h6a2 2 0 012 2v2m-9 4h10m-11 4h12m-13 4h14' },
   { path: '/students', label: 'Add Student', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
 ]
 
@@ -85,7 +86,7 @@ export default function HomePage() {
 
           <div>
             <h3 className="mb-4 text-sm font-medium text-gray-700">Quick add</h3>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {QUICK_ADD_BUTTONS.map(({ path, label, icon }) => (
                 <button
                   key={path}

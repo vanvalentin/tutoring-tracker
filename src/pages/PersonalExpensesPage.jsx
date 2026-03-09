@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { TextField, Button, Checkbox, FormControlLabel, Stack, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Box, Typography } from '@mui/material'
+import { TextField, Button, Stack, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Box, Typography } from '@mui/material'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import dayjs from 'dayjs'
-import { useMaterial } from '../hooks/useSupabase'
+import { usePersonalExpenses } from '../hooks/useSupabase'
 import Modal from '../components/Modal'
 import SortableTable from '../components/SortableTable'
-import StatusBadge from '../components/StatusBadge'
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -18,22 +17,14 @@ const COLUMNS = [
   { key: 'date', label: 'Date', cell: (val) => formatDate(val) },
   { key: 'description', label: 'Expense Description' },
   { key: 'amount', label: 'Amount (HKD)' },
+  { key: 'category', label: 'Category' },
   { key: 'vendor', label: 'Vendor/Source' },
-  {
-    key: 'paidByParent',
-    label: 'Reimbursed by Parent',
-    cell: (val) => (
-      <StatusBadge variant={val ? 'success' : 'neutral'}>
-        {val ? 'Yes' : 'No'}
-      </StatusBadge>
-    ),
-  },
-  { key: 'note', label: 'Note/Purpose' },
+  { key: 'note', label: 'Note' },
 ]
 
-export default function MaterialPage() {
+export default function PersonalExpensesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { data: material, loading, error, add, update, remove } = useMaterial()
+  const { data: personalExpenses, loading, error, add, update, remove } = usePersonalExpenses()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState(null)
@@ -41,8 +32,8 @@ export default function MaterialPage() {
     date: new Date().toISOString().slice(0, 10),
     description: '',
     amount: '',
+    category: '',
     vendor: '',
-    paidByParent: false,
     note: '',
   })
 
@@ -53,44 +44,48 @@ export default function MaterialPage() {
         date: new Date().toISOString().slice(0, 10),
         description: '',
         amount: '',
+        category: '',
         vendor: '',
-        paidByParent: false,
         note: '',
       })
       setModalOpen(true)
     }
-  }, [searchParams])
+  }, [searchParams, setSearchParams])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     const amountNum = parseFloat(formData.amount)
-    if (!formData.description.trim() || isNaN(amountNum)) return
+    if (isNaN(amountNum)) return
+    const normalizedDate = formData.date || new Date().toISOString().slice(0, 10)
+    const normalizedDescription = formData.description.trim()
+
     try {
       if (editingId) {
         await update(editingId, {
-          date: formData.date,
-          description: formData.description,
+          date: normalizedDate,
+          description: normalizedDescription,
           amount: amountNum,
+          category: formData.category,
           vendor: formData.vendor,
-          paidByParent: formData.paidByParent,
           note: formData.note,
         })
       } else {
         await add({
-          date: formData.date,
-          description: formData.description,
+          date: normalizedDate,
+          description: normalizedDescription,
           amount: amountNum,
+          category: formData.category,
           vendor: formData.vendor,
-          paidByParent: formData.paidByParent,
           note: formData.note,
         })
       }
+
       setFormData({
         date: new Date().toISOString().slice(0, 10),
         description: '',
         amount: '',
+        category: '',
         vendor: '',
-        paidByParent: false,
         note: '',
       })
       setEditingId(null)
@@ -106,8 +101,8 @@ export default function MaterialPage() {
       date: item.date,
       description: item.description ?? '',
       amount: String(item.amount ?? ''),
+      category: item.category ?? '',
       vendor: item.vendor ?? '',
-      paidByParent: item.paidByParent ?? false,
       note: item.note ?? '',
     })
     setModalOpen(true)
@@ -129,7 +124,7 @@ export default function MaterialPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">Business Expenses</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Personal Expenses</h2>
         <Button
           variant="contained"
           onClick={() => {
@@ -138,8 +133,8 @@ export default function MaterialPage() {
               date: new Date().toISOString().slice(0, 10),
               description: '',
               amount: '',
+              category: '',
               vendor: '',
-              paidByParent: false,
               note: '',
             })
             setModalOpen(true)
@@ -157,7 +152,7 @@ export default function MaterialPage() {
       <Modal
         isOpen={modalOpen}
         onClose={() => { setModalOpen(false); setEditingId(null) }}
-        title={editingId ? 'Edit Business Expense' : 'Add Business Expense'}
+        title={editingId ? 'Edit Personal Expense' : 'Add Personal Expense'}
       >
         <form onSubmit={handleSubmit}>
           <Stack spacing={2}>
@@ -171,8 +166,7 @@ export default function MaterialPage() {
               label="Expense Description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="e.g. Whiteboard markers"
-              required
+              placeholder="e.g. Laptop bag"
               fullWidth
             />
             <TextField
@@ -181,28 +175,26 @@ export default function MaterialPage() {
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               placeholder="0"
-              inputProps={{ min: 0, step: 1 }}
+              inputProps={{ min: 0, step: 0.01 }}
               required
+              fullWidth
+            />
+            <TextField
+              label="Category"
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              placeholder="e.g. Food, Shopping, Bills"
               fullWidth
             />
             <TextField
               label="Vendor/Source"
               value={formData.vendor}
               onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-              placeholder="e.g. Commercial Press"
+              placeholder="Optional vendor"
               fullWidth
             />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.paidByParent}
-                  onChange={(e) => setFormData({ ...formData, paidByParent: e.target.checked })}
-                />
-              }
-              label="Reimbursed by Parent?"
-            />
             <TextField
-              label="Note/Purpose"
+              label="Note"
               value={formData.note}
               onChange={(e) => setFormData({ ...formData, note: e.target.value })}
               placeholder="Optional note"
@@ -223,13 +215,13 @@ export default function MaterialPage() {
       <Dialog
         open={confirmDeleteItem !== null}
         onClose={() => setConfirmDeleteItem(null)}
-        aria-labelledby="confirm-delete-business-expense-title"
-        aria-describedby="confirm-delete-business-expense-description"
+        aria-labelledby="confirm-delete-personal-expense-title"
+        aria-describedby="confirm-delete-personal-expense-description"
       >
-        <DialogTitle id="confirm-delete-business-expense-title">Delete business expense?</DialogTitle>
+        <DialogTitle id="confirm-delete-personal-expense-title">Delete personal expense?</DialogTitle>
         <DialogContent>
-          <DialogContentText id="confirm-delete-business-expense-description">
-            You are about to delete this business expense.
+          <DialogContentText id="confirm-delete-personal-expense-description">
+            You are about to delete this personal expense.
           </DialogContentText>
           {confirmDeleteItem && (
             <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1, bgcolor: 'grey.100' }}>
@@ -237,6 +229,7 @@ export default function MaterialPage() {
                 <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Date: </Box>{formatDate(confirmDeleteItem.date)}<br />
                 <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Description: </Box>{confirmDeleteItem.description || '—'}<br />
                 <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Amount: </Box>{confirmDeleteItem.amount} HKD
+                {confirmDeleteItem.category?.trim() && <><br /><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Category: </Box>{confirmDeleteItem.category}</>}
                 {confirmDeleteItem.vendor?.trim() && <><br /><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Vendor: </Box>{confirmDeleteItem.vendor}</>}
                 {confirmDeleteItem.note?.trim() && <><br /><Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Note: </Box>{confirmDeleteItem.note}</>}
               </Typography>
@@ -261,9 +254,9 @@ export default function MaterialPage() {
       ) : (
         <SortableTable
           columns={COLUMNS}
-          data={material}
-          emptyMessage="No business expenses yet. Click Add Entry to create one."
-          searchPlaceholder="Search by description, vendor, note..."
+          data={personalExpenses}
+          emptyMessage="No personal expenses yet. Click Add Entry to create one."
+          searchPlaceholder="Search by description, category, vendor, note..."
           cardTitleKey="description"
           renderActions={(row) => (
             <>
